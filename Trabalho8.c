@@ -15,6 +15,27 @@ FILE *btfd; //cria o arquivo da arvore como sendo global
 #define NO 0
 #define YES 1
 
+//MENU
+typedef enum m{ //organizar o menu
+	insercao=1, busca_geral, busca_ind, carregar, sair=0 
+}MENU;
+
+//STRUCTS
+typedef struct inserir{ //struct para a funcao carrega_arquivos
+	char CodCli[3];
+	char CodF[3];
+	char NomeCli[50];
+	char NomeF[50];
+	char Genero[50];
+}INSERIR;
+
+typedef struct buscar{ //struct para a funcao carrega_arquivos
+	char CodCli[3];
+	char CodF[3];
+}BUSCAR;
+
+
+
 //ESTRUTURA DA PAGINA
 typedef struct{
     int keycount; //numero de chaves na pagina
@@ -22,7 +43,9 @@ typedef struct{
     int child[MAXKEYS+1]; //ponteiros para os rrn de descendentes
 }BTPAGE;
 #define PAGESIZE sizeof(BTPAGE);
+
 //PROTOTIPOS
+void carrega_arquivos(INSERIR *add, BUSCAR *busca);
 void btclose();
 int btopen();
 int btread(int rrn, BTPAGE *page_ptr);
@@ -39,6 +62,32 @@ int search_node(int key, BTPAGE *p_page, int *pos);
 void split(int key, int r_child, BTPAGE *p_oldpage, int *promo_key, int *promo_r_child, BTPAGE *p_newpage);
 
 //SUBROTINAS
+void carrega_arquivos(INSERIR *add, BUSCAR *busca){//---------------CARREGA_ARQUIVOS
+  FILE *arq;
+	int i;
+	/*__________CARREGA INSERIR__________*/
+	i=0;
+	arq = fopen("CasosTeste//insere.bin", "r+b");//cria e abre o arquivo insere
+	rewind(arq);//volta ao comeÃƒÂ§o do arquivo por garantia
+	//salva os registros de insercao em um vetor auxiliar add
+	while(!feof(arq)){
+		fread(&add[i], sizeof(INSERIR), 1, arq);
+		i++;
+	}
+	fclose(arq);//fecha o arquivo insere
+  /*__________CARREGA BUSCAR__________*/
+	i=0;
+	arq = fopen("CasosTeste//busca.bin", "r+b");//cria e abre o arquivo insere
+	rewind(arq);//volta ao comeÃƒÂ§o do arquivo por garantia
+	//salva os registros de insercao em um vetor auxiliar busca
+	while(!feof(arq)){
+		fread(&busca[i], sizeof(BUSCAR), 1, arq);
+		i++;
+	}
+	printf("----Upload realizado----\n");
+	
+	return;
+}
 void btclose(){
     fclose(btfd);
 }
@@ -216,10 +265,13 @@ int main(){
     }else{
         root = create_tree(btfd);
     }
-    while ((key = getchar()) != '0'){
+    scanf("%d", &key);
+    while (key != 0){
         promoted = insert(root, key, &promo_rrn, &promo_key);
         if (promoted)
             root = create_root(promo_key, root, promo_rrn);
+    
+        scanf("%d", &key);
     }
     btclose(btfd);
     return 0;
