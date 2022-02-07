@@ -1,6 +1,8 @@
 //Exercicio 8
 //Caio de Assis Ribeiro e Carolina Silva Marostica
 //exercicio de Arvore-B de ordem 4
+
+
 //IMPORTS
 #include<stdio.h>
 
@@ -34,9 +36,6 @@ typedef struct buscar{ //struct para a funcao carrega_arquivos
 	char CodF[3];
 }BUSCAR;
 
-
-
-//ESTRUTURA DA PAGINA
 typedef struct{
     int keycount; //numero de chaves na pagina
     int key[MAXKEYS]; //a chave atual
@@ -131,16 +130,16 @@ int create_tree(){
 int getpage(){
     int addr;
     rewind(btfd); //volta no comeco do arquivo
-    addr = fseek(btfd, 0, 2); //colocar cabecalho-----------------------------------
+    addr = fseek(btfd, 0, 4); //colocar cabecalho-----------------------------------
     ftell(btfd); //----------------------------------------------------
     return addr/PAGESIZE; //retorna o numero da pagina
 }
 int getroot(){
     int root;
-    fseek(btfd, 0, 0); //voltar ao comeco do arquivo --------------pular o header depois
+    fseek(btfd, 0, 4); //voltar ao comeco do arquivo --------------pular o header depois
     if (fread(&root, sizeof(int), 2, btfd) == 0){ //ler um char de tamanho 2 para pegar raiz
         printf("Nao foi possivel achar a raiz\n");
-        return 1;
+        return 1; 
     }
     return (root);
 }
@@ -274,5 +273,6 @@ int main(){
         scanf("%d", &key);
     }
     btclose(btfd);
+    
     return 0;
 }
