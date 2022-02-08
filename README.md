@@ -9,3 +9,5 @@ A função pegakey() foi arrumada.
 Ainda não entendi a função insert direito. Na main o primeiro argumento é a raiz (root), mas o parâmetro que recebe é o rrn.
 
 ##Atualização2
+Esqueleto da função busca_um();
+Como saber quantas paginas ja foram escritas? É o rrn?
