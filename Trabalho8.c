@@ -66,7 +66,7 @@ int pegakey();
 //SUBROTINAS
 void carrega_arquivos(){//---------------------------------------------------------------CARREGA OS ARQUIVOS BASE
     FILE *arq;
-    int i=0;
+    int i=0,j;
 	//carrega vetor de struct add
 	    arq = fopen("CasosTeste//insere.bin", "r+b");//abre o arquivo insere
 	    rewind(arq);//volta ao comeco do arquivo por garantia
@@ -94,10 +94,10 @@ void btclose(){//---------------------------------------------------------------
     fclose(inseridos);
 }
 int btopen(){//--------------------------------------------------------------------------CRIA OS ARQUIVOS BASE
-    int tam_reg, ind_add, ind_busca, dist;
+    int tam_reg, ind_add=0, ind_busca=0, dist=0;
 
     if(access("inseridos.bin", F_OK)!=0){ //se o arquivo nao existe
-       btree = fopen("btree.bin", "w+b"); //cria o arquivo de indice da arvore
+        btree = fopen("btree.bin", "w+b"); //cria o arquivo de indice da arvore
         putroot(-1); 
         //------------header, numero da pagina da raiz?------------
         inseridos = fopen("inseridos.bin", "w+b"); //cria o arquivo dos registros
@@ -151,7 +151,7 @@ int create_tree(){//------------------------------------------------------------
 int getpage(){//-------------------------------------------------------------------------PEGA O NUMERO DA PAGINA
     int addr;
     rewind(btree); //volta no comeco do arquivo
-    addr = fseek(btree, 0, 4)-4; //menos o int do header
+    addr = fseek(btree, 0, 4); //menos o int do header
     ftell(btree);
     return addr/PAGESIZE; //retorna o numero da pagina
 }
@@ -241,10 +241,15 @@ int pegakey(int indice){
     }else{
         ind_add=0;
     }
-    int aux1=atol(add[ind_add].CodCli),
-    aux2=atol(add[ind_add].CodCli);
+     //variavel auxiliar
+    char codf[3], codc[3];
+    strcpy(codc,add[ind_add].CodCli);
+    strcpy(codf,add[ind_add].CodF); 
+    //char em int
+    int aux1=atoi(codf),
+    aux2=atoi(codc);
     item = aux1 + aux2;
-    return 3;
+    return item;
 }
 void split(int key, int r_child, BTPAGE *p_oldpage, int *promo_key,
             int *promo_r_child, BTPAGE *p_newpage){//------------------------------------DIVIDE A PAGINA
@@ -290,14 +295,14 @@ int main(){//-------------------------------------------------------------------
         scanf(" %d", &op);
         switch(op){
             case insercao://1
-                if (btopen()==NO){//NO = os arquivos ja existiam
-                    pegakey(1);
+                if (btopen()==YES){//YES = os arquivos ja existiam
+                    key = pegakey(1);
                     root = getroot(btree);
                 }else{//os arquivos foram criados agora
-                    pegakey(0);
+                    key =pegakey(0);
                     root = create_root(key, NIL, NIL);
                 }
-                promoted = insert(root, key, &promo_rrn, &promo_key);
+                promoted = insert(root, key, &promo_rrn, &promo_key);//primeiro argumento é a raiz, mas ele recebe na funcao como o rrn ???
                 if (promoted)
                     root = create_root(promo_key, root, promo_rrn);
                 break;
