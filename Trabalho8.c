@@ -62,6 +62,7 @@ void putroot(int root);
 int search_node(int key, BTPAGE *p_page, int *pos);
 void split(int key, int r_child, BTPAGE *p_oldpage, int *promo_key, int *promo_r_child, BTPAGE *p_newpage);
 int pegakey();
+void busca_um();
 
 //SUBROTINAS
 void carrega_arquivos(){//---------------------------------------------------------------CARREGA OS ARQUIVOS BASE
@@ -286,6 +287,30 @@ void split(int key, int r_child, BTPAGE *p_oldpage, int *promo_key,
     p_oldpage->keycount = MINKEYS;
     *promo_key = workkeys[MINKEYS];
 }
+void busca_um(){
+   /* int ind_busca, item, *pos=0, *pag=0, found, i;
+
+    fseek(inseridos, 10 , SEEK_SET);
+    fread(&ind_busca, sizeof(int), 1, inseridos);
+     //variavel auxiliar
+    char codf[3], codc[3];
+    strcpy(codc,busca[ind_busca].CodCli);
+    strcpy(codf,busca[ind_busca].CodF); 
+    //char em int
+    int aux1=atoi(codf),
+    aux2=atoi(codc);
+    //chave que deve ser buscada
+    item = aux1 + aux2;
+    for(i=0; i< <numero de paginas>; i++){
+        found=search_node(item, pag, pos);
+        if(found){
+            printf("Chave %d encontrada, pagina %d, posicao %d", item, pag, pos);
+            return;
+        }
+    }
+    printf("Chave %d nao encontrada", item);        */
+}
+
 
 //PRINCIPAL
 int main(){//-------------------------------------------------------------------------------------MAIN
@@ -310,7 +335,7 @@ int main(){//-------------------------------------------------------------------
                 //busca_todos();     
                 break;
             case busca_ind: //3
-                //busca_um();     
+                busca_um();     
                 break;
             case carregar: //4
                 carrega_arquivos();
