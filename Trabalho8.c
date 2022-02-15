@@ -33,6 +33,7 @@ typedef struct buscar{ //struct para a funcao carrega_arquivos
 	char CodF[3];
 }BUSCAR;
 typedef struct{
+    int num_pag;
     int keycount; //numero de chaves na pagina
     int key[MAXKEYS]; //a chave atual
     int child[MAXKEYS+1]; //ponteiros para os rrn de descendentes
@@ -65,6 +66,7 @@ int pegakey();
 void busca_um();
 int inopen();
 void inwrite();
+
 //SUBROTINAS
 void carrega_arquivos(){//---------------------------------------------------------------CARREGA OS ARQUIVOS BASE
     FILE *arq;
@@ -111,7 +113,6 @@ int inopen(){//-----------------------------------------------------------------
     int tam_reg, ind_add=0, ind_busca=0, dist=0;
 
     if(access("inseridos.bin", F_OK)!=0){ //se o arquivo nao existe
-        //------------header, numero da pagina da raiz?------------
         inseridos = fopen("inseridos.bin", "w+b"); //cria o arquivo dos registros
         tam_reg=sizeof(int)+sizeof(int)+sizeof(int)+sizeof(int)+sizeof(char)+
         sizeof(char)+sizeof(char)+sizeof(char); //(20)
@@ -121,6 +122,7 @@ int inopen(){//-----------------------------------------------------------------
         fwrite("#",sizeof(char),1,inseridos);
         fwrite(&ind_busca,sizeof(int),1,inseridos); //indice de buscas ja realizadas
         fwrite("#",sizeof(char),1,inseridos);
+        dist=tam_reg;
         fwrite(&dist,sizeof(int),1,inseridos); //distancia do header
         fwrite("#",sizeof(char),1,inseridos);
         return NO; //os arquivos foram criados
@@ -140,7 +142,8 @@ int btwrite (int rrn, BTPAGE *page_ptr){//--------------------------------------
     int addr;
     addr = (rrn * (sizeof(BTPAGE)))+4; //endereco_geral = (num_pagina * tam_Pag) +4 do header
     fseek(btree, addr, 0);//vai ate o endereco geral recuperado
-    return(fwrite(page_ptr, sizeof(BTPAGE), 1, btree)); //escrevea pagina toda
+    page_ptr->num_pag=rrn;
+    return(fwrite(page_ptr, sizeof(BTPAGE), 1, btree)); //escreve a pagina toda
 }
 int create_root (int key, int left, int right){//----------------------------------------CRIA UMA NOVA PAGINA
     BTPAGE page;
@@ -150,10 +153,13 @@ int create_root (int key, int left, int right){//-------------------------------
     page.key[0]=key; 
     page.child[0]=left;
     page.child[1]=right;
-    page.keycount=0;
+    if(key==0){ //é a criacao no btopen?
+        page.keycount=0;
+    }else{ //é a criacao no split?
+        page.keycount=1;
+    }
     btwrite(rrn, &page);//escreve no arquivo btree
     putroot(rrn);
-
     return(rrn);
 }
 int create_tree(){//---------------------------------------------------------------------CRIA A ARVORE
@@ -162,9 +168,8 @@ int create_tree(){//------------------------------------------------------------
 }
 int getpage(){//-------------------------------------------------------------------------PEGA O NUMERO DA PAGINA
     int addr;
-    rewind(btree); //volta no comeco do arquivo
-    addr = fseek(btree, 0, 0); //menos o int do header
-    ftell(btree);
+    fseek(btree, 0, SEEK_END); //menos o int do header
+    addr = ftell(btree);
     return addr/PAGESIZE; //retorna o numero da pagina
 }
 int getroot(){//-------------------------------------------------------------------------PEGA A RAIZ
@@ -174,25 +179,35 @@ int getroot(){//----------------------------------------------------------------
     return (root);
 }
 int insert (int rrn, int key, int *promo_r_child, int *promo_key){
-    BTPAGE page, // pagina atual
-    newpage; // pagina temporaria
-    int found, promoted, // valores booleanos
+    BTPAGE page, //pagina atual
+    newpage; //pagina temporaria
+    int found, promoted, //valores booleanos
     pos, //posicao
-    p_b_rrn; // rrn promoted from below
-    int p_b_key; // key promoted from below
+    p_b_rrn, //rrn promoted from below
+    ind_add;
+    int p_b_key; //key promoted from below
 
     //chave inserida sem divisao e sem promocao
     if (rrn == NIL){ //se cabe
         *promo_key = key;
         *promo_r_child = NIL;
-        return(YES);  //a chave e inserida
+        return(YES); //a chave e inserida
     }
     btread(rrn, &page);
+
+
     //chave duplicada
+    //ta conferindo so na pagina atual, precisa procurar em todas as paginas
     found = search_node(key, &page, &pos);
     if (found){ //a chave ja existe?
-        printf ("Chave %d duplicada.", key);
-        return(-1);
+        printf ("Chave %d duplicada.\n", key);
+        fseek(inseridos, 5, 0);
+        fread(&ind_add, sizeof(int),1, inseridos);
+        ind_add++;
+        fseek(inseridos, 5, 0);
+        fwrite(&ind_add, sizeof(int), 1, inseridos);
+        return(3);
+        //parece que nao ta sainda do laco, mesmo que encontre uma duplicada na primeira pagina
     }
 
     promoted = insert(page.child[pos], key, &p_b_rrn, &p_b_key);
@@ -207,7 +222,7 @@ int insert (int rrn, int key, int *promo_r_child, int *promo_key){
     }else{ //se nao cabem na pagina
         split(p_b_key, p_b_rrn, &page, promo_key, promo_r_child, &newpage); //divide
         printf("Divisao de no.\n");
-        printf("Chave %d promovida.\n", &promo_key);
+        printf("Chave %d promovida.\n", *promo_key);
         btwrite(rrn, &page);
         btwrite(*promo_r_child, &newpage);
         return(YES); //foi inserido
@@ -233,11 +248,21 @@ void pageinit (BTPAGE *p_page){//-----------------------------------------------
     p_page->child[MAXKEYS]=NIL;
     return;
 }
-void putroot(int root){//----------------------------------------------------------------ATUALIZA A PAGINA DA RAIZ
+void putroot(int root){//----------------------------------------------------------------ATUALIZA A PAGINA EM QUE A RAIZ ESTÁ
     fseek(btree,0,0);
     fwrite(&root, sizeof(root), 1, btree);//numero pagina
 }
 int search_node(int key, BTPAGE *p_page, int *pos){
+    int i;
+    for (i = 0; i < p_page->keycount && key > p_page->key[i]; i++){
+        *pos = i;
+    }
+    if (*pos < p_page->keycount && key == p_page->key[*pos]){
+        return(YES);
+    }
+    return(NO);
+}
+int procura(int key, BTPAGE *p_page, int *pos){
     int i;
     for (i = 0; i <= p_page->keycount && key >= p_page->key[i]; i++){
         *pos = i;
@@ -264,13 +289,12 @@ int pegakey(){
     item = aux1 + aux2;
     return item;
 }
-void split(int key, int r_child, BTPAGE *p_oldpage, int *promo_key,
+/*void split(int key, int r_child, BTPAGE *p_oldpage, int *promo_key,
             int *promo_r_child, BTPAGE *p_newpage){//------------------------------------DIVIDE A PAGINA
     int j;
     short mid;
     char workkeys[MAXKEYS+1];
     int workchil[MAXKEYS+2];
-    printf("ERRO");
     //os vetores temporarios recebem os dados da pagina que teve overflow
     for (j = 0; j < MAXKEYS; j++){
         workkeys[j] = p_oldpage->key[j];
@@ -299,30 +323,93 @@ void split(int key, int r_child, BTPAGE *p_oldpage, int *promo_key,
     p_newpage->keycount = MAXKEYS - MINKEYS;
     p_oldpage->keycount = MINKEYS;
     *promo_key = workkeys[MINKEYS];
+}*/
+void split(int key, int r_child, BTPAGE *p_oldpage, int *promo_key,
+            int *promo_r_child, BTPAGE *p_newpage){//------------------------------------DIVIDE A PAGINA
+    int j, num_pag;
+    int workkeys[MAXKEYS+1];
+    int workchil[MAXKEYS+2];
+
+    //vetores temporarios recebem os dados da pagina que teve overflow
+    for (j = 0; j < MAXKEYS; j++){
+        workkeys[j] = p_oldpage->key[j];
+        workchil[j] = p_oldpage->child[j];
+    }
+    workchil[j] = p_oldpage->child[j];
+    //se a nova chave for maior que a atual ultima
+    if(workkeys[j]<key){//insere no final
+        workkeys[j+1]=key;
+        workchil[j+2]=r_child;
+    }else{//procura onde deve ser inserida
+        for (j = MAXKEYS; key < workkeys[j-1] && j > 0; j--){
+            workkeys[j] = workkeys[j-1];
+            workchil[j+1] = workchil[j];
+        }
+        workkeys[j] = key;
+        workchil[j+1] = r_child;
+    }
+
+    *promo_r_child = getpage();
+    //preenche a a nova pagina com os valores default
+    pageinit(p_newpage);
+    //limpa a pagina antiga para inserir so os novos valores
+    pageinit(p_oldpage);
+    //escreve a nova pagina com os valores na struct
+    for (j = 0; j < MINKEYS; j++){
+        //escreve key[0]
+        p_oldpage->key[j] = workkeys[j];
+        p_oldpage->child[j] = workchil[j];
+        //key[1]=promovido
+        //escreve o key[2]
+        p_newpage->key[j] = workkeys[j+1+MINKEYS];
+        p_newpage->child[j] = workchil[j+1+MINKEYS];
+        //nao escreve o que foi promovido
+        p_oldpage->key[j+MINKEYS] = NOKEY;
+        p_oldpage->child[j+1+MINKEYS] = NIL;
+        //escreve o key[3]
+        p_newpage->key[j+MINKEYS] = workkeys[j+2+MINKEYS];
+        p_newpage->child[j+MINKEYS] = workchil[j+3+MINKEYS];
+
+    }
+    //escreve o filho do que foi promovido
+    p_oldpage->child[MINKEYS] = workchil[MINKEYS];
+    //escreve o filho do primeiro da nova pagina
+    p_newpage->child[MINKEYS] = workchil[j+1+MINKEYS];
+    //numero de chaves na nova pagina
+    p_newpage->keycount = MAXKEYS - MINKEYS;
+    //numero de chaves na antiga pagina
+    p_oldpage->keycount = MINKEYS;
+    //promo_key recebe a antiga key[1]
+    *promo_key = workkeys[MINKEYS];
 }
 void inwrite(){
-    int ind_add,distanciap_origem,tam_reg, aux;
-    char registro[155];
+    int ind_add,distanciap_origem;
 
+    //coleta dos indices
     fseek(inseridos, 5, 0);
     fread(&ind_add, sizeof(int),1, inseridos);
-    
-    sprintf(registro,"#%s#%s#%s#%s#%s", add[ind_add].CodCli, add[ind_add].CodF, 
-	add[ind_add].NomeCli, add[ind_add].NomeF, add[ind_add].Genero);
-	tam_reg = strlen(registro);//pega apenas o tamanho valido de registro
-	tam_reg++;//\0
-    fseek(inseridos,0, SEEK_END);
-    fwrite(&tam_reg, sizeof(int),1,inseridos);
-    fwrite(registro, sizeof(char), tam_reg, inseridos); //escreve o registro
-
-    fseek(inseridos, 5, 0);
+    fseek(inseridos, 15, 0);
+    fread(&distanciap_origem, sizeof(int), 1, inseridos);
+    //escrita em inseridos
+	fseek(inseridos,0, SEEK_END);
+    fwrite(&distanciap_origem, sizeof(int),1,inseridos);
+    fwrite(&add[ind_add].CodCli, sizeof(char),3,inseridos);
+    fwrite(&add[ind_add].CodF, sizeof(char),3,inseridos);
+    fwrite(&add[ind_add].NomeCli, sizeof(char),50,inseridos);
+    fwrite(&add[ind_add].NomeF, sizeof(char),50,inseridos);
+    fwrite(&add[ind_add].Genero, sizeof(char),50,inseridos);
+    //atualizacao do header de inseridos
     ind_add++;
+    fseek(inseridos, 5, 0);
     fwrite(&ind_add, sizeof(int), 1, inseridos);
-    fseek(inseridos,15,0);   
+    distanciap_origem=distanciap_origem+160;
+    fseek(inseridos,15,0);    
+    fwrite(&distanciap_origem, sizeof(int), 1, inseridos);
+
 }
 void busca_um(){
-    int ind_busca, item, *pos=0, found, i;
-    BTPAGE *pag=0;
+    int ind_busca, item, *pos=0, found, i, num_pag;
+    BTPAGE *pag;
     fseek(inseridos, 10 , SEEK_SET);
     fread(&ind_busca, sizeof(int), 1, inseridos);
     
@@ -337,11 +424,29 @@ void busca_um(){
 
     //chave que deve ser buscada
     item = aux1 + aux2;
-    
-    found=search_node(item, pag, pos);     
-    if(found){
-        printf("Chave %d encontrada, pagina %d, posicao %d", item, pag, pos);
-        return;
+
+    //buscando
+    fseek(btree,0,0);
+    fread(&num_pag, sizeof(int), 1,btree);
+    for(i=0;i<=num_pag;i++){
+        fseek(btree, (sizeof(BTPAGE)*i), 0); //troca de pagina
+        fread(&pag, sizeof(BTPAGE), 1, btree); //le a pagina
+        pos=0;
+        printf("key=%d", pag->key);///////////////////teste->ta dando errado
+        found=procura(item, pag, pos);     
+        if(found){
+            printf("Chave %d encontrada, pagina %d, posicao %d", item, pag, pos);
+            /*
+            aux = pag->pos_principal; //criar em btpage um campo para o BoF
+            fseek(inseridos, 0, aux+4); //a distancia+4 da proxima distancia
+            printf("Codigo cliente: %s", fread()); //printar as informacoes
+            */
+            //atualiza o indice da busca
+            fseek(inseridos, 10 , SEEK_SET);
+            ind_busca++;
+            fwrite(&ind_busca, sizeof(int), 1, inseridos);
+            return;
+        }
     }
     printf("Chave %d nao encontrada", item);
 }
@@ -349,9 +454,9 @@ void busca_um(){
 
 //PRINCIPAL
 int main(){//----------------------------------------------------------------------------MAIN
-    int promoted, root, promo_rrn, promo_key, key, op, aux;
+    int promoted, root, promo_rrn, promo_key, key, op;
     //inicializa os arquivos base
-    aux=btopen();
+    btopen();
     inopen();
     //menu    
     do{
@@ -362,11 +467,11 @@ int main(){//-------------------------------------------------------------------
                 fseek(btree,0,0);
                 fread(&root,sizeof(int),1,btree);
                 key=pegakey();
-                promoted = insert(root, key, &promo_rrn, &promo_key);//primeiro argumento é a raiz, mas ele recebe na funcao como o rrn ???
+                promoted = insert(root, key, &promo_rrn, &promo_key);
                 if (promoted){
                     root = create_root(promo_key, root, promo_rrn);
                 }
-                if(promoted!=-1){
+                if(promoted!=3){
                     //escreve no arquivo inseridos
                     inwrite();                    
                     printf("Chave %d inserida com sucesso.\n", key);
