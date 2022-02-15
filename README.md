@@ -13,7 +13,14 @@
 - [x] Como saber quantas paginas ja foram escritas? É o rrn?
 
 ### Atuaização3
-- Não está escrevendo os filhos depois do split
-- Parece que só escreve 1 pagina a mais depois do split
+- [x] Não está escrevendo os filhos depois do split
+- [x] Parece que só escreve 1 pagina a mais depois do split
 - Quando da uma pesquisa(3) ele nao escreve o ultimo dado que era pra ser escrito em btree 
 - Não está inserindo mais chaves depois que encontra uma duplicada.
+
+### Atualização4
+- [x] Numero da pagina em cada btpage
+- [x] Keycount da pagina promovida
+- Key duplicada
+- BoF na struct btpage
+- Pegar a pagina direito no busca_um();
